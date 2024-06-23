@@ -1,0 +1,42 @@
+name: coverage
+
+on:
+  push:
+
+jobs:
+  row-format-bench:
+    name: Row format bench
+    runs-on: ubuntu-latest
+    container:
+      image: amd64/rust
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-builder
+      - name: Install critcmp
+        run: cargo install --force critcmp
+      - name: Python-dev
+        run: |
+          apt-get update
+          apt-get install -yq python3.11-dev
+      - name: Benchmark branch
+        run: |
+          echo BRANCH_COMMIT=`git log -n1 --oneline` >> $GITHUB_ENV
+          cargo bench --all-features --color always --bench row_format -- --save-baseline branch
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          clean: false
+          ref: master
+      - name: Benchmark master
+        run: |
+          echo MASTER_COMMIT=`git log -n1 --oneline` >> $GITHUB_ENV
+          cargo bench --all-features --color always --bench row_format -- --save-baseline master
+      - name: Compare benchmark results
+        run: |
+          echo "Branch: ${{ env.BRANCH_COMMIT }}"
+          echo "Master: ${{ env.MASTER_COMMIT }}"
+          critcmp --color always master branch
